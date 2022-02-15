@@ -3,6 +3,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+const _ = require("lodash");
 //Local module thats why we are using .js in the end...
 // const date = require(__dirname + "/date.js");
 
@@ -21,14 +22,15 @@ app.use(express.static("public"));
 mongoose.connect("mongodb://localhost:27017/todolistDB");
 
 
-// ================Mongoose Schema======================⭐
-const listSchema = {
+// ================Mongoose Schema (DATA)======================⭐
+const itemsSchema = {
   name: String, //Data type in Uppercase.
 };
 
+
 // ===========Mmongoose Model===================
 
-const Item = mongoose.model( "Item", listSchema);
+const Item = mongoose.model( "Item", itemsSchema);
 
 // =============Mongoose Document===========
 const item1 = new Item({
@@ -45,8 +47,13 @@ const item3 = new Item({
 
 const defaultItems = [item1,item2,item3];
 
-
-
+//Mongoose Custom list Schema for multiple routes.
+const listSchema = {
+  name: String,
+  items: [itemsSchema]
+};
+ //Mongoose model for multiple routes.
+ const List = mongoose.model("List", listSchema);
 
 
 
@@ -76,49 +83,96 @@ app.get("/", function(req, res) {
     });
     }
   });
+
 });
 
-    // ==================post request response==================
-  app.post("/", function(request,respond){
+//==================== Express Route Parameters (for multiple routes)================================
+app.get("/:customListName", function(req, res){
+  
+  const customListName = _.capitalize(req.params.customListName);
+  //Finding as the route is already exist.
+  List.findOne({name: customListName}, function(err, foundList){
+    if(!err){
+      if(!foundList){
+        //Create a new list.
+        const list = new List ({
+          name: customListName,
+          items: defaultItems
+        });
+      
+        list.save();
+        //After making a new route redirecting the route to that route.
+        res.redirect("/" + customListName);
+      } else {
+        //Show an existing list.
+        res.render("List", {listTitle: foundList.name, newListItems: foundList.items});
+        
+      }
+      
+    }
+  });
 
-//stores users input in variable item.
-    let itemName = request.body.newItem;
+  
+
+});
+
+
+    // ==================post request response==================
+app.post("/", function(req,res){
+
+ //stores users input in variable item.
+    const itemName = req.body.newItem;
+    const listName = req.body.list;
 
     //mongoose document.
     const item = new Item({
       name: itemName
     });
 
-    item.save();
+    //Checking if the route is home or other and adding items according to it...
+    if(listName === "Today"){
+      item.save();
+      res.redirect("/");
+    }  else {
+        List.findOne({name: listName}, function(err, foundList){
+        foundList.items.push(item);
+        foundList.save();
+        res.redirect("/" + listName);
+      });
+    }
+});
 
-    respond.redirect("/");
+app.post("/delete",function(req,res){
+  const checkedItemId = req.body.checkbox;
+  const listName = req.body.listName;
 
-  //   if(request.body.list === "Work"){
-  //     workItems.push(item);
-
-  //     respond.redirect("/work");
-
-  //   } else {
-  //     foundItems.push(item); // and push it in larger array everytime user input any item.⭐
-
-  //     respond.redirect("/") //after pushing it redirect to the app.get or home/root route.
-
-  //   }
-  });
-
-  //==================== targeting work route================================
-  app.get("/work", function(req, res){
-    res.render("list", {
-      listTitle: "Work List",
-      newListItems:workItems
+  if (listName === "Today"){
+    Item.findByIdAndRemove(checkedItemId, function(err){
+      if(!err){
+        console.log("Successfully deleted the item");
+        res.redirect("/");
+      }
+        
     });
 
-  });
+  } else {
+    List.findOneAndUpdate({name: listName}, {$pull:{items: {_id: checkedItemId}}}, function(err, foundList){
+      if(!err){
+        res.redirect("/"+ listName);
+      }
+    });
+
+  }
+
+  
+});
+
+  
 
   // ===============about page render===============
-  app.get("/about", function(req, res) {
-    res.render("about");
-  });
+app.get("/about", function(req, res) {
+  res.render("about");
+});
 
 
 

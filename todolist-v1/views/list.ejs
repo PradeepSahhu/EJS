@@ -10,11 +10,14 @@
     <div class="box">
       <!-- using forEach for looping the items and .name to specifying what to render -->
       <% newListItems.forEach(function(item){ %>
-        <div class="item">
-          <input type="checkbox">
-          <p><%=item.name%></p>
+        <form action="/delete" method="post">
+          <div class="item">
+           <input type="checkbox" name="checkbox" value="<%=item._id%>" onChange="this.form.submit()"> <!--submit the form when checkbox is checked. -->
+           <p><%=item.name%></p>
 
-        </div>
+          </div>
+          <input type="hidden" name="listName" value="<%= listTitle %>"></input>
+        </form>
 
       <% }); %>
 
